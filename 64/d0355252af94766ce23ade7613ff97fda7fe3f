@@ -1,0 +1,75 @@
+.github/workflows/build-apk.yml
+  s_6429f832de214f::t_535b814bd824c1 1-44
+.gitignore
+  s_6429f832de214f::t_083effd7cd0bf9 1-41
+.npmrc
+  s_6429f832de214f::t_c14e30991839fc 1
+app.json
+  s_6429f832de214f::t_67cc31196df0e9 1-40
+app/_layout.tsx
+  s_6429f832de214f::t_a81c5fb9380ac1 1-35
+app/create.tsx
+  s_6429f832de214f::t_56393b8437b39b 1-319
+app/detail/[id].tsx
+  s_6429f832de214f::t_32ab0db5611648 1-428
+app/index.tsx
+  s_6429f832de214f::t_9b00b6aa919745 1-198
+app/records.tsx
+  s_6429f832de214f::t_f501f20ad760ef 1-142
+assets/vendor/OrbitControls.txt
+  s_6429f832de214f::t_c26abf1e4f4b7d 1-1532
+assets/vendor/three.module.txt
+  s_6429f832de214f::t_44688696392396 1-53032
+components/DateTimePicker.tsx
+  s_6429f832de214f::t_41cdcf29b2dfe8 1-167
+components/Earth.tsx
+  s_6429f832de214f::t_86cfcc70e9d566 1-364
+components/GlowPoint.tsx
+  s_6429f832de214f::t_d2cfbb1fe071ed 1-43
+components/ImageGrid.tsx
+  s_6429f832de214f::t_3069717aeb94ad 1-82
+components/LocationPicker.tsx
+  s_6429f832de214f::t_9aa33840f14c07 1-387
+components/MapAdjuster.tsx
+  s_6429f832de214f::t_cf5b40746ffb2d 1-219
+components/MemoryCard.tsx
+  s_6429f832de214f::t_80a7dbe56ec0d6 1-112
+lib/coordinates.ts
+  s_6429f832de214f::t_51b542a3e578f9 1-18
+lib/database.ts
+  s_6429f832de214f::t_bbe7dc806b1899 1-165
+lib/exif.ts
+  s_6429f832de214f::t_3335ced9df7994 1-50
+lib/export.ts
+  s_6429f832de214f::t_a7701fa31adfdf 1-218
+lib/storage.ts
+  s_6429f832de214f::t_f6797c104a83f6 1-46
+metro.config.js
+  s_6429f832de214f::t_d304fb891ac77d 1-8
+package-lock.json
+  s_6429f832de214f::t_84b5bc6aa93098 1-9712
+package.json
+  s_6429f832de214f::t_08b4a2f33e0695 1-38
+scripts/download-textures.js
+  s_6429f832de214f::t_69367cd3d35b78 1-93
+tsconfig.json
+  s_6429f832de214f::t_f00cae5b115645 1-15
+types/three.d.ts
+  s_6429f832de214f::t_a83fc58ea37861 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "64d0355252af94766ce23ade7613ff97fda7fe3f",
+  "prompts": {},
+  "sessions": {
+    "s_6429f832de214f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f1a5-3f48-7360-b675-140bf602e5e2",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "ftli <ftli@leqee.com>"
+    }
+  }
+}
