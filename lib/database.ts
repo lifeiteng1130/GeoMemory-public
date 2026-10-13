@@ -104,17 +104,17 @@ export async function addMemory(data: {
 export async function getMemories(): Promise<MemoryWithImages[]> {
   const db = await getDatabase();
   const memories = await db.getAllAsync<Memory>('SELECT * FROM memories ORDER BY date_time DESC');
-  const result: MemoryWithImages[] = [];
-
-  for (const mem of memories) {
-    const images = await db.getAllAsync<MemoryImage>(
-      'SELECT * FROM memory_images WHERE memory_id = ? ORDER BY sort_order',
-      [mem.id]
-    );
-    result.push({ ...mem, images });
+  if (memories.length === 0) return [];
+  const images = await db.getAllAsync<MemoryImage>(
+    'SELECT * FROM memory_images ORDER BY sort_order'
+  );
+  const imagesByMemory = new Map<string, MemoryImage[]>();
+  for (const image of images) {
+    const group = imagesByMemory.get(image.memory_id) || [];
+    group.push(image);
+    imagesByMemory.set(image.memory_id, group);
   }
-
-  return result;
+  return memories.map(mem => ({ ...mem, images: imagesByMemory.get(mem.id) || [] }));
 }
 
 export async function getMemoryById(id: string): Promise<MemoryWithImages | null> {

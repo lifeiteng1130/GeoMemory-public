@@ -3,10 +3,8 @@ import { View, TextInput, TouchableOpacity, Text, StyleSheet, Alert, ScrollView 
 import * as Location from 'expo-location';
 import MapAdjuster from './MapAdjuster';
 
-// 高德 Web 服务 Key（地理编码/逆地理编码）
-// 申请：https://console.amap.com/dev/key/app
-// 添加 Key 时「服务平台」选【Web服务】，把 Key 填到下面
-const AMAP_KEY = 'xxxxx';
+// ⚠️ 替换为你自己的高德 API Key（免费申请：https://lbs.amap.com）
+const AMAP_KEY: string = 'xxxxx';
 
 interface LocationPickerProps {
   latitude: number;
@@ -160,6 +158,15 @@ export default function LocationPicker({
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('权限不足', '需要定位权限才能获取当前位置');
+        return;
+      }
+
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert('定位服务已关闭', '请在系统设置中开启定位服务后重试', [
+          { text: '确定' },
+          { text: '手动输入', onPress: () => {} },
+        ]);
         return;
       }
 

@@ -5,6 +5,7 @@ import JSZip from 'jszip';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as SQLite from 'expo-sqlite';
 import { getDatabase } from './database';
+import { writeBackupZip } from './backup-zip';
 
 interface ImportMemory {
   id: string;
@@ -25,55 +26,43 @@ interface ImportImage {
   sort_order: number;
 }
 
-export async function exportBackup(): Promise<void> {
-  const dbFile = new File(Paths.document, 'SQLite', 'geomemory.db');
+export async function exportBackup(onProgress?: (value: { done: number; total: number }) => void): Promise<void> {
+  const snapshotName = `_backup_snapshot_${Date.now()}_${Math.random().toString(36).slice(2)}.db`;
+  const dbFile = new File(Paths.document, 'SQLite', snapshotName);
   const mediaDir = new Directory(Paths.document, 'media');
-  const zip = new JSZip();
-  const dbFolder = zip.folder('db');
-  const mediaFolder = zip.folder('media');
+  let snapshotDb: SQLite.SQLiteDatabase | null = null;
+  try {
+    const sourceDb = await getDatabase();
+    snapshotDb = await SQLite.openDatabaseAsync(snapshotName);
+    await SQLite.backupDatabaseAsync({ sourceDatabase: sourceDb, destDatabase: snapshotDb });
+    await snapshotDb.closeAsync();
+    snapshotDb = null;
 
-  // Add database
-  if (dbFile.exists) {
-    const dbBytes = await dbFile.bytes();
-    dbFolder?.file('geomemory.db', dbBytes);
-  }
-
-  // Add media files
-  if (mediaDir.exists) {
-    const entries = mediaDir.list();
-    console.log('[Export] media dir entries count:', entries.length);
-    for (const entry of entries) {
-      if (entry instanceof File) {
-        console.log('[Export] adding media file:', entry.name);
-        const bytes = await entry.bytes();
-        mediaFolder?.file(entry.name, bytes);
+    const entries: { name: string; file: File }[] = [{ name: 'db/geomemory.db', file: dbFile }];
+    if (mediaDir.exists) {
+      for (const entry of mediaDir.list()) {
+        if (entry instanceof File) entries.push({ name: `media/${entry.name}`, file: entry });
       }
     }
-  } else {
-    console.log('[Export] media dir does not exist');
+    const zipFile = new File(Paths.cache, `geomemory_backup_${Date.now()}.zip`);
+    zipFile.create();
+    let shared = false;
+    try {
+      await writeBackupZip(zipFile, entries, onProgress);
+      if (!await Sharing.isAvailableAsync()) throw new Error('当前设备不支持分享备份文件');
+      await Sharing.shareAsync(zipFile.uri, {
+        mimeType: 'application/zip',
+        dialogTitle: '导出 GeoMemory 备份',
+      });
+      shared = true;
+    } finally {
+      // The receiving app may read the shared URI after the chooser closes.
+      if (!shared && zipFile.exists) zipFile.delete();
+    }
+  } finally {
+    if (snapshotDb) await snapshotDb.closeAsync();
+    if (dbFile.exists) dbFile.delete();
   }
-
-  // Generate zip as base64
-  const base64 = await zip.generateAsync({ type: 'base64' });
-  const zipPath = Paths.cache.uri + 'geomemory_backup.zip';
-  await FileSystem.writeAsStringAsync(zipPath, base64, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-
-  // Share zip file
-  const canShare = await Sharing.isAvailableAsync();
-  if (canShare) {
-    await Sharing.shareAsync(zipPath, {
-      mimeType: 'application/zip',
-      dialogTitle: '导出 GeoMemory 备份',
-    });
-  }
-
-  // Cleanup
-  try {
-    const tmpFile = new File(zipPath);
-    if (tmpFile.exists) tmpFile.delete();
-  } catch {}
 }
 
 export async function importBackup(): Promise<{ imported: number; skipped: number }> {
@@ -182,6 +171,7 @@ export async function importBackup(): Promise<{ imported: number; skipped: numbe
       const entry = zip.file(name);
       if (!entry || entry.dir) continue;
       const fileName = name.split('/').pop();
+      if (!fileName) continue;
       const newPath = pathMap.get(fileName);
       console.log('[Import] zip file:', name, '→ lookup key:', fileName, '→ found path:', newPath);
       if (!newPath) { console.log('[Import] SKIP - no pathMap match'); continue; }

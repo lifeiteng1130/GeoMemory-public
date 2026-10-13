@@ -1,10 +1,13 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import Earth from '../components/Earth';
 import MemoryCard from '../components/MemoryCard';
 import { getMemories, MemoryWithImages } from '../lib/database';
 import { exportBackup, importBackup } from '../lib/export';
+import AnniversaryLetter from '../components/AnniversaryLetter';
+import type { AnniversaryLetterContent } from '../lib/anniversary';
+import { getLaunchAnniversaryLetter } from '../lib/anniversary-session';
 
 const { width, height } = Dimensions.get('window');
 
@@ -14,10 +17,22 @@ export default function HomeScreen() {
   const [selectedMemory, setSelectedMemory] = useState<MemoryWithImages | null>(null);
   const [loading, setLoading] = useState(true);
   const [mapLayer, setMapLayer] = useState('standard');
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState('');
+  const [anniversaryLetter, setAnniversaryLetter] = useState<AnniversaryLetterContent | null>(null);
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    getLaunchAnniversaryLetter().then(setAnniversaryLetter).catch(error => {
+      console.warn('Anniversary greeting unavailable:', error);
+    });
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
+      setIsFocused(true);
       loadMemories();
+      return () => setIsFocused(false);
     }, [])
   );
 
@@ -38,10 +53,18 @@ export default function HomeScreen() {
   };
 
   const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
     try {
-      await exportBackup();
+      await exportBackup(({ done, total }) => {
+        if (done === total || done % 10 === 0) setExportProgress(`${done}/${total}`);
+      });
     } catch (e) {
       console.error('Export failed:', e);
+      Alert.alert('导出失败', String(e));
+    } finally {
+      setExporting(false);
+      setExportProgress('');
     }
   };
 
@@ -74,6 +97,9 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {anniversaryLetter && isFocused && (
+        <AnniversaryLetter letter={anniversaryLetter} onClose={() => setAnniversaryLetter(null)} />
+      )}
       {/* 3D Earth */}
       <View style={styles.earthContainer}>
         <Earth memories={memories} onPointPress={handlePointPress} onLayerChange={setMapLayer} />
@@ -104,8 +130,9 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={[styles.pillBtn, mapLayer === 'standard' ? styles.pillBtnStandard : styles.pillBtnDark]}
           onPress={handleExport}
+          disabled={exporting}
         >
-          <Text style={[styles.pillBtnText, mapLayer === 'standard' && styles.pillBtnTextStandard]}>导出</Text>
+          <Text style={[styles.pillBtnText, mapLayer === 'standard' && styles.pillBtnTextStandard]}>{exporting ? `导出中 ${exportProgress}` : '导出'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.pillBtn, mapLayer === 'standard' ? styles.pillBtnStandard : styles.pillBtnDark]}

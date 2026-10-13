@@ -4,6 +4,8 @@ import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system/legacy';
 import { MemoryWithImages } from '../lib/database';
 import { getFullPath } from '../lib/storage';
+import { getMapThumbnail } from '../lib/map-thumbnail';
+import { markerScript } from '../lib/map-markers';
 
 // 高德 Web端(JS API) Key + 安全密钥（地球/地图展示）
 // 申请：https://console.amap.com/dev/key/app
@@ -46,8 +48,6 @@ html, body { background: #1a1a2e; }
 window._AMapSecurityConfig = { securityJsCode: '${AMAP_SECRET}' };
 var DEVICE_DPR = ${dpr};
 var map = null;
-var markers = [];
-var thumbs = {};
 var currentLayer = 'standard';
 var satelliteLayer = null;
 var roadNetLayer = null;
@@ -119,53 +119,15 @@ function switchLayer(type) {
   }
 }
 
-function addMarkers(points) {
-  markers.forEach(function(m) { m.setMap(null); });
-  markers = [];
-  thumbs = {};
-
-  points.forEach(function(p, i) {
-    var marker = new AMap.Marker({
-      position: [p.lng, p.lat],
-      offset: new AMap.Pixel(-10, -10),
-      content: '<div class="marker-wrap"><div class="marker-dot"></div></div>',
-      extData: { id: p.id },
-      zIndex: 100 + i
-    });
-
-    marker.on('click', function() {
-      var data = this.getExtData();
-      window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'point_click', id: data.id }));
-    });
-
-    marker.setMap(map);
-    markers.push(marker);
-    thumbs[p.id] = marker;
-  });
-
-  window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'error', msg: 'MARKERS_ADDED:' + points.length }));
-}
-
-function addThumbnail(id, base64) {
-  var marker = thumbs[id];
-  if (!marker) return;
-
-  var content = '<div class="marker-wrap">' +
-    '<img class="marker-thumb" src="' + base64 + '" />' +
-    '</div>';
-
-  marker.setContent(content);
-  marker.setOffset(new AMap.Pixel(-24, -54));
-  marker.setzIndex(200);
-}
+${markerScript}
 
 window.addEventListener('message', function(e) {
   try {
     var data = JSON.parse(e.data);
     if (data.type === 'add_markers') {
-      addMarkers(data.points);
+      syncMarkers(data.points, data.revision);
     } else if (data.type === 'add_thumb') {
-      addThumbnail(data.id, data.base64);
+      addThumbnail(data.id, data.imageKey, data.revision, data.base64);
     } else if (data.type === 'switch_layer') {
       switchLayer(data.layer);
     }
@@ -205,7 +167,10 @@ export default function Earth({ memories, onPointPress, onLayerChange }: EarthPr
   const webViewRef = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
   const [layerType, setLayerType] = useState<'standard' | 'satellite' | 'dark'>('standard');
-  const thumbsSentRef = useRef<Set<string>>(new Set());
+  const revisionRef = useRef(0);
+  const [thumbnailRequest, setThumbnailRequest] = useState<{
+    revision: number; missing: { id: string; imageKey: string }[];
+  } | null>(null);
 
   const dpr = PixelRatio.get();
   const htmlSource = useMemo(() => ({ html: generateHtml(dpr) }), [dpr]);
@@ -219,6 +184,8 @@ export default function Earth({ memories, onPointPress, onLayerChange }: EarthPr
       } else if (data.type === 'map_ready') {
         console.log('[Earth] Amap ready');
         setReady(true);
+      } else if (data.type === 'markers_synced' && data.revision === revisionRef.current) {
+        setThumbnailRequest({ revision: data.revision, missing: data.missing });
       } else if (data.type === 'layer_switched') {
         setLayerType(data.layer);
       } else if (data.type === 'error') {
@@ -229,14 +196,13 @@ export default function Earth({ memories, onPointPress, onLayerChange }: EarthPr
 
   // Send markers
   useEffect(() => {
-    if (!ready || !webViewRef.current || memories.length === 0) return;
-    thumbsSentRef.current.clear();
-    const points = memories.map(m => ({ id: m.id, lat: m.latitude, lng: m.longitude }));
+    if (!ready || !webViewRef.current) return;
+    const revision = ++revisionRef.current;
+    const points = memories.map(m => ({ id: m.id, lat: m.latitude, lng: m.longitude, imageKey: m.images[0]?.file_path || '' }));
     console.log('[Earth] Sending markers:', points.length);
-    const js = `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(JSON.stringify({ type: 'add_markers', points }))} }));`;
-    // Small delay ensures map's JS context is fully ready after page load
-    const timer = setTimeout(() => webViewRef.current?.injectJavaScript(js), 200);
-    return () => clearTimeout(timer);
+    const js = `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(JSON.stringify({ type: 'add_markers', points, revision }))} })); true;`;
+    webViewRef.current.injectJavaScript(js);
+    return () => { ++revisionRef.current; };
   }, [memories, ready]);
 
   const switchToLayer = useCallback((type: string) => {
@@ -247,40 +213,36 @@ export default function Earth({ memories, onPointPress, onLayerChange }: EarthPr
 
   // Send thumbnails
   useEffect(() => {
-    if (!ready || memories.length === 0) return;
+    if (!ready || !thumbnailRequest) return;
     let cancelled = false;
+    const { revision, missing } = thumbnailRequest;
     const sendThumbs = async () => {
-      for (const m of memories) {
-        if (cancelled || !m.images.length) continue;
-        if (thumbsSentRef.current.has(m.id)) continue;
+      for (const { id, imageKey } of missing) {
+        if (cancelled || revision !== revisionRef.current) return;
         try {
-          const fullPath = getFullPath(m.images[0].file_path);
-          // verify file exists before reading
-          const info = await FileSystem.getInfoAsync(fullPath);
-          if (!info.exists) {
-            console.log('[Earth] thumb file not found:', fullPath);
-            continue;
+          let dataUri: string;
+          try {
+            dataUri = await getMapThumbnail(imageKey, dpr);
+          } catch {
+            // Keep photos usable if a particular image cannot be resized.
+            if (cancelled || revision !== revisionRef.current) return;
+            const b64 = await FileSystem.readAsStringAsync(getFullPath(imageKey), { encoding: FileSystem.EncodingType.Base64 });
+            const mime = imageKey.split('.').pop()?.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+            dataUri = `data:${mime};base64,${b64}`;
           }
-          const b64 = await FileSystem.readAsStringAsync(fullPath, { encoding: FileSystem.EncodingType.Base64 });
-          if (!b64 || b64.length < 100) continue;
-          if (cancelled) return;
-          const ext = m.images[0].file_path.split('.').pop()?.toLowerCase() || 'jpg';
-          const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
-          const dataUri = `data:${mime};base64,${b64}`;
-          const payload = JSON.stringify({ type: 'add_thumb', id: m.id, base64: dataUri });
-          const js = `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(payload)} }));`;
+          if (cancelled || revision !== revisionRef.current) return;
+          const payload = JSON.stringify({ type: 'add_thumb', id, imageKey, revision, base64: dataUri });
+          const js = `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(payload)} })); true;`;
           webViewRef.current?.injectJavaScript(js);
-          thumbsSentRef.current.add(m.id);
-          await new Promise(r => setTimeout(r, 100));
+          await new Promise(r => setTimeout(r, 16));
         } catch (e) {
-          console.error('[Earth] thumb error:', m.id, String(e));
+          console.error('[Earth] thumb error:', id, String(e));
         }
       }
     };
-    // Wait for markers (200ms) to be fully created before sending thumbnails
-    const timer = setTimeout(sendThumbs, 800);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [memories, ready]);
+    void sendThumbs();
+    return () => { cancelled = true; };
+  }, [thumbnailRequest, ready, dpr]);
 
   return (
     <View style={styles.container}>
@@ -289,6 +251,7 @@ export default function Earth({ memories, onPointPress, onLayerChange }: EarthPr
         source={htmlSource}
         style={styles.webview}
         onMessage={handleMessage}
+        onLoadStart={() => { ++revisionRef.current; setReady(false); setThumbnailRequest(null); }}
         javaScriptEnabled
         domStorageEnabled
         cacheEnabled
