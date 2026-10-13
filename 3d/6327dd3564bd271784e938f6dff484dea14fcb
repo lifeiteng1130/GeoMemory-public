@@ -1,0 +1,59 @@
+tests/backup-stream.test.cjs
+  s_6429f832de214f::t_1dfc0ef63788fa 1-63
+components/AnniversaryLetter.tsx
+  s_6429f832de214f::t_d0a46a0b4607b7 1-76
+lib/map-markers.ts
+  s_6429f832de214f::t_02f71d457c9278 1-60
+package.json
+  s_6429f832de214f::t_7e3bd5cd722b6d 18
+tests/export-snapshot.test.cjs
+  s_6429f832de214f::t_a070d122d817c4 1-63
+types/legacy-three-jsx.d.ts
+  s_6429f832de214f::t_40b8eecfbab256 1-13
+lib/database.ts
+  s_6429f832de214f::t_d59fd7f19742cd 107-115,117
+tests/anniversary.test.cjs
+  s_6429f832de214f::t_be464cb164cada 1-67
+tests/anniversary-presentation.test.cjs
+  s_6429f832de214f::t_540b91b1f87c78 1-15
+lib/backup-zip.ts
+  s_6429f832de214f::t_0480558f41befe 1-129
+components/LocationPicker.tsx
+  s_6429f832de214f::t_8013bbe8a7f8c2 6-7,164-172
+lib/anniversary.ts
+  s_6429f832de214f::t_7a913f2313ca8e 1-23
+tests/README.md
+  s_6429f832de214f::t_73a41f82c626db 1-35
+types/three.d.ts
+  s_6429f832de214f::t_0459ad2285565d 1-19
+lib/map-thumbnail.ts
+  s_6429f832de214f::t_482957cabf77f8 1-48
+tests/map-performance.test.cjs
+  s_6429f832de214f::t_b73198ec8e3e3d 1-167
+components/Earth.tsx
+  s_6429f832de214f::t_1ed9d4e0871519 7-8,122,128,130,170-173,187-188,199-201,203-205,216,218,220-221,223-231,233-235,237,239,243-245,254
+app/index.tsx
+  s_6429f832de214f::t_2c1eac13d09a2f 1,8-10,20-29,33,35,56-57,59-61,64-67,100-102,133,135
+lib/export.ts
+  s_6429f832de214f::t_1a522949998102 8,29-31,33-44,47-64,174
+lib/anniversary-session.ts
+  s_6429f832de214f::t_6c8a56a3ea0b43 1-26
+package-lock.json
+  s_6429f832de214f::t_e64245b5ed697e 17,5255-5266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3d6327dd3564bd271784e938f6dff484dea14fcb",
+  "prompts": {},
+  "sessions": {
+    "s_6429f832de214f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f1a5-3f48-7360-b675-140bf602e5e2",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "ftli <ftli@leqee.com>"
+    }
+  }
+}
